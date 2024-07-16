@@ -237,8 +237,8 @@ combined_data <- cbind(X_train[, "lag1"], X_train[, "lag2"], y_train)
 #print(combined_data)
 
 # Crear una lista de diferentes valores de sesgo para probar
-#bias_values <- seq(from = -1, to = 1, by = 0.1)
-bias_value <- -0.1
+bias_values <- seq(from = -1, to = 1, by = 0.1)
+#bias_value <- -0.1
 
 # Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
 mejor_sesgo <- NULL
@@ -251,7 +251,7 @@ global_hidden1 <- 10
 global_hidden2 <- 10
 
 # Bucle para probar diferentes valores de sesgo
-#for (bias_value in bias_values) {
+for (bias_value in bias_values) {
   # Añadir una columna de sesgo a X_train y X_test
   X_train_b <- cbind(bias_value, X_train)
   X_test_b <- cbind(bias_value, X_test)
@@ -283,7 +283,7 @@ global_hidden2 <- 10
     mejor_X_test_b <- X_test_b
     mejor_nn <- nn
   }
-#}
+}
 
 nn <- mejor_nn
 X_train_b <- mejor_X_train_b
@@ -294,8 +294,11 @@ errores <- y_test - nn$feedforward(X_test_b)
 
 # Calcular el Error Cuadrático Medio (MSE)
 mse <- mean(errores ^ 2)
+rmse <- sqrt(mse)
 # Calcular el Error Absoluto Medio (MAE)
 mae <- mean(abs(errores))
+mae_ingenuo <- mean(abs(diff(y_train)))
+mase <- mae / mae_ingenuo
 # Calcular el R² para las predicciones de entrenamiento
 errores_entrenamiento <- y_train - nn$feedforward(X_train_b)
 ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
@@ -313,8 +316,11 @@ r_cuadrado_prueba <- 1 - (ss_res_prueba / ss_tot_prueba)
 cat("Mejor Sesgo:", mejor_sesgo, "\n")
 #mse
 cat("Error Cuadrático Medio:", mse, "\n")
+#rmse
+cat("Raiz del Error Cuadrático Medio:", rmse, "\n")
 #mae
 cat("Error Absoluto Medio:", mae, "\n")
+cat("Error Absoluto Medio Escalado:", mase, "\n")
 # Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
 cat(
   "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",
@@ -351,7 +357,7 @@ mejor_X_train_con_errores_b <- NULL
 mejor_X_test_con_errores_b <- NULL
 
 # Bucle para probar diferentes valores de sesgo
-#for (bias_value in bias_values) {
+for (bias_value in bias_values) {
   X_train_con_errores_b <- cbind(bias_value, X_train_con_errores)
   X_test_con_errores_b <- cbind(bias_value, X_test_con_errores)
   
@@ -382,7 +388,7 @@ mejor_X_test_con_errores_b <- NULL
     mejor_X_test_con_errores_b <- X_test_con_errores_b
     mejor_nn <- nn
   }
-#}
+}
 
 nn <- mejor_nn
 X_train_con_errores_b <- mejor_X_train_con_errores_b
@@ -397,6 +403,8 @@ mse <- mean(errores ^ 2)
 # Calcular el Error Absoluto Medio (MAE)
 mae <- mean(abs(errores))
 # Calcular el R² para las predicciones de entrenamiento
+mae_ingenuo <- mean(abs(diff(y_train)))
+mase <- mae / mae_ingenuo
 errores_entrenamiento <- y_train - nn$feedforward(X_train_con_errores_b)
 ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
 ss_tot_entrenamiento <- sum((y_train - mean(y_train)) ^ 2)
@@ -415,6 +423,7 @@ cat("Mejor Sesgo:", mejor_sesgo, "\n")
 cat("Error Cuadrático Medio:", mse, "\n")
 #mae
 cat("Error Absoluto Medio:", mae, "\n")
+cat("Error Absoluto Medio Escalado:", mase, "\n")
 # Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
 cat(
   "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",

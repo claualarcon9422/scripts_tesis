@@ -80,10 +80,10 @@ aplicar_test_ljung_box <- function(serie, max_lag, titulo) {
 }
 
 # Graficar serie temporal de temperatura máxima
-graficar_serie_temporal(serie_temporal_tmax, "Temperatura Máxima", "Serie Temporal de Temperaturas Máximas")
+graficar_serie_temporal(serie_temporal_tmax, "Temperatura Máxima [°C]", "Serie Temporal de Temperaturas Máximas")
 
 # Graficar serie temporal de precipitación
-graficar_serie_temporal(serie_temporal_pr, "Precipitación", "Serie Temporal de Precipitaciones Máximas")
+graficar_serie_temporal(serie_temporal_pr, "Precipitación Máxima [mm]", "Serie Temporal de Precipitaciones Máximas")
 
 
 # Crear gráficos de Ljung-Box y ACF/PACF
@@ -135,8 +135,8 @@ serie_temporal_pr <- normalizar_serie(serie_temporal_pr)
 
 
 
-# Función para ajustar y graficar modelo ARIMA
-ajustar_y_graficar_arima <- function(serie, titulo) {
+# Función para ajustar y graficar modelo
+ajustar_y_graficar <- function(serie,tipo,variable, titulo) {
   # Crear un data frame con la serie temporal
   df <- data.frame(Fecha = index(serie), Valor = coredata(serie))
   
@@ -150,9 +150,68 @@ ajustar_y_graficar_arima <- function(serie, titulo) {
   # Conjunto de prueba
   datos_prueba <- df[(n_train + 1):n, ]
   
-  # Entrenar el modelo ARIMA
-  modelo <- auto.arima(datos_entrenamiento$Valor)
-  str(modelo)
+  
+  if(tipo == "suavizado temp"){
+    modelo <- forecast::ets(datos_entrenamiento$Valor)
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.ets(modelo, h = nrow(datos_prueba), level = 0.95)
+  }else if(tipo == "suavizado prec"){
+    modelo <- forecast::ets(datos_entrenamiento$Valor, model = "AAN")
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.ets(modelo, h = nrow(datos_prueba), level = 0.95)
+  }else if (tipo == "arima temp"){
+    # Entrenar el modelo ARIMA
+    modelo <- arima(datos_entrenamiento$Valor, order = c(4, 0, 1), seasonal = list(order = c(0, 0, 0)))
+    
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.Arima(modelo, h = nrow(datos_prueba), level = 0.95)
+    # Gráfico de diagnóstico del modelo ARIMA
+    tsdiag(modelo)
+    ordenes <- arimaorder(modelo)
+    print(ordenes)
+    #str(modelo)
+  }else if (tipo == "arima prec"){
+    # Entrenar el modelo ARIMA
+    modelo <- arima(datos_entrenamiento$Valor, order = c(2, 0, 3), seasonal = list(order = c(0, 0, 0)))
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.Arima(modelo, h = nrow(datos_prueba), level = 0.95)
+    # Gráfico de diagnóstico del modelo ARIMA
+    tsdiag(modelo)
+    #str(modelo)
+    ordenes <- arimaorder(modelo)
+    print(ordenes)
+  }else if (tipo == "sarima temp"){
+    # Entrenar el modelo ARIMA
+    modelo <- arima(datos_entrenamiento$Valor, order = c(4, 0, 1), seasonal = list(order = c(1, 1, 1), period = 12))
+  
+    
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.Arima(modelo, h = nrow(datos_prueba), level = 0.95)
+    # Gráfico de diagnóstico del modelo ARIMA
+    tsdiag(modelo)
+    ordenes <- arimaorder(modelo)
+    print(ordenes)
+    summary(modelo)
+    #str(modelo)
+  }else if (tipo == "sarima prec"){
+    # Entrenar el modelo ARIMA
+    modelo <- arima(datos_entrenamiento$Valor, order = c(2, 0, 3), seasonal = list(order = c(1, 1, 1), period = 12))
+   
+    # Calcular intervalos de confianza
+    intervalos_confianza <- forecast:::forecast.Arima(modelo, h = nrow(datos_prueba), level = 0.95)
+    # Gráfico de diagnóstico del modelo ARIMA
+    tsdiag(modelo)
+    #str(modelo)
+    ordenes <- arimaorder(modelo)
+    print(ordenes)
+    summary(modelo)
+  }
+  
+  
+  
+ 
+  
+  
   
   # Generar predicciones para el conjunto de prueba
   predicciones <- forecast(modelo, h = nrow(datos_prueba))
@@ -163,8 +222,7 @@ ajustar_y_graficar_arima <- function(serie, titulo) {
   # Calcular el R^2
   r_cuadrado <- 1 - (sum((datos_prueba$Valor - predicciones$mean)^2) / sum((datos_prueba$Valor - mean(datos_prueba$Valor))^2))
   
-  # Calcular intervalos de confianza
-  intervalos_confianza <- forecast:::forecast.Arima(modelo, h = nrow(datos_prueba), level = 0.95)
+  
   
   # Crear un data frame con los intervalos de confianza
   intervalos_df <- data.frame(
@@ -175,14 +233,13 @@ ajustar_y_graficar_arima <- function(serie, titulo) {
   # Renombrar las columnas
   colnames(intervalos_df) <- c("Fecha", "Lower", "Upper")
   
-  texto_metricas <- paste("RMSE:", round(metricas[1, "RMSE"], 4),
-                          "\nMAE:", round(metricas[1, "MAE"], 4),
-                          "\nMAPE:", round(metricas[1, "MAPE"], 4),
-                          "\nMASE:", round(metricas[1, "MASE"], 4),
+  texto_metricas <- paste("RECM:", round(metricas[1, "RMSE"], 4),
+                          "\nEAM:", round(metricas[1, "MAE"], 4),
+                          "\nEPAM:", round(metricas[1, "MAPE"], 4),
+                          "\nEAME:", round(metricas[1, "MASE"], 4),
                           "\nR²:", round(r_cuadrado, 4))
   
-  # Gráfico de diagnóstico del modelo ARIMA
-  tsdiag(modelo)
+ 
   
   # Plot de la serie temporal y predicciones
   grafico <- ggplot() +
@@ -192,7 +249,7 @@ ajustar_y_graficar_arima <- function(serie, titulo) {
     geom_line(data = data.frame(Fecha = datos_prueba$Fecha, Prediccion = predicciones$mean),
               aes(x = Fecha, y = Prediccion, color = "Predicción"), linewidth = 0.70) +
     geom_ribbon(data = intervalos_df, aes(x = Fecha, ymin = Lower, ymax = Upper, fill = "Intervalo de confianza"), alpha = 0.5) +
-    labs(x = "Fecha", y = "Valor", 
+    labs(x = "Fecha", y = variable, 
          title = titulo,
          color = "Variables") +
     scale_x_date(date_breaks = "72 month", date_labels = "%b %Y") +
@@ -215,19 +272,33 @@ ajustar_y_graficar_arima <- function(serie, titulo) {
   # Dibujar el gráfico
   grid.newpage()
   grid.draw(grafico)
-  xoff <-0.825
-  yoff <- -0.2
+  xoff <-0.75
+  yoff <- -0.23
   
-  grid.text(label = "Métricas", x = unit(xoff, "npc"), y = unit(0.74 + yoff, "npc"),
+  grid.text(label = "Métricas", x = unit(xoff+0.01, "npc"), y = unit(0.74 + yoff, "npc"),
             just = "left", gp = gpar(fontsize = 12, col = "black"))
   grid.text(label = texto_metricas, x = unit(xoff+0.01, "npc"), y = unit(0.6 + yoff, "npc"),
             just = "left", gp = gpar(col = "black", fontsize = 10))
 }
 
+# Ajustar y graficar modelo S.E. para temperatura máxima normalizada
+ajustar_y_graficar(serie_temporal_tmax,"suavizado temp","Temperatura Máxima [°C]", "Serie Temporal Normalizada de Temperatura Máxima y Predicciones con \nSuavizado Exponencial")
+
+# Ajustar y graficar modelo S.E. para precipitación normalizada
+ajustar_y_graficar(serie_temporal_pr,"suavizado prec","Precipitación Máxima [mm]", "Serie Temporal Normalizada de Precipitación y Predicciones con \nSuavizado Doble Aditivo")
+
 
 # Ajustar y graficar modelo ARIMA para temperatura máxima normalizada
-ajustar_y_graficar_arima(serie_temporal_tmax, "Serie Temporal Normalizada de Temperatura Máxima y Predicciones con ARIMA")
+ajustar_y_graficar(serie_temporal_tmax,"arima temp","Temperatura Máxima [°C]", "Serie Temporal Normalizada de Temperatura Máxima y Predicciones con ARIMA")
 
 # Ajustar y graficar modelo ARIMA para precipitación normalizada
-ajustar_y_graficar_arima(serie_temporal_pr, "Serie Temporal Normalizada de Precipitación y Predicciones con ARIMA")
+ajustar_y_graficar(serie_temporal_pr,"arima prec","Precipitación Máxima [mm]", "Serie Temporal Normalizada de Precipitación y Predicciones con ARIMA")
+
+# Ajustar y graficar modelo ARIMA para temperatura máxima normalizada
+ajustar_y_graficar(serie_temporal_tmax,"sarima temp","Temperatura Máxima [°C]", "Serie Temporal Normalizada de Temperatura Máxima y Predicciones con \nSARIMA")
+
+# Ajustar y graficar modelo ARIMA para precipitación normalizada
+ajustar_y_graficar(serie_temporal_pr,"sarima prec","Precipitación Máxima [mm]", "Serie Temporal Normalizada de Precipitación y Predicciones con SARIMA")
+
+
 
