@@ -3,6 +3,8 @@ library(xts)
 library(R6)
 library(lubridate)
 library(ggplot2)
+library(grid)
+library(gridExtra)
 
 NeuralNetwork <- R6Class(
   "NeuralNetwork",
@@ -123,13 +125,14 @@ indice_central_lat <- length(lat) %/% 2
 #print(lat[indice_central_lat])
 #print(lon[indice_central_lon])
 
-#print(lat)
-#print(lon)
+print(lat[404])
+print(lon[80])
 
 # Obtener las temperaturas máximas y precipitaciones para la coordenada central
 tmax_central <- tmax[80, 404, ]
 print(max(tmax_central))
-pr_central <- pr[indice_central_lon, indice_central_lat, ]
+#pr_central <- pr[indice_central_lon, indice_central_lat, ]
+pr_central <- pr[80, 404, ]
 print(max(pr_central))
 print(min(pr_central))
 
@@ -178,80 +181,80 @@ windows_pr <- create_sliding_windows(pr_norm, windows_size)
 X <- windows_tmax$X
 y <- windows_tmax$y
 
-#X <- windows_pr$X
-#y <- windows_pr$y
+
 
 #print(y)
 
-# Dividir los datos en conjuntos de entrenamiento y prueba (70% - 30%)
-set.seed(123)
-n <- nrow(X)
-n_train <- round(0.7 * n)
-
-# Conjunto de entrenamiento
-X_train <- X[1:n_train, ]
-y_train <- y[1:n_train]
-
-# Conjunto de prueba
-X_test <- X[(n_train + 1):n, ]
-y_test <- y[(n_train + 1):n]
-
-#Añadir columnas para lags
-X_train <- cbind(X_train,
-                 lag1 = rep(NA, nrow(X_train)),
-                 lag2 = rep(NA, nrow(X_train)))
-X_test <- cbind(X_test, lag1 = rep(NA, nrow(X_test)), lag2 = rep(NA, nrow(X_test)))
-
-#Primeros 12 lags son los mismos valores de y (temp reales)
-X_train[, "lag1"] <- y_train
-X_train[, "lag2"] <- y_train
-
-X_test[, "lag1"] <- y_test
-X_test[, "lag2"] <- y_test
-
-# Agregar lag1 y lag2
-for (i in 13:nrow(X_train)) {
-  X_train[i, "lag1"] <- y_train[i] - y_train[i - 12]
-}
-
-for (i in 25:nrow(X_train)) {
-  X_train[i, "lag2"] <- y_train[i] - y_train[i - 24]
-}
-
-
-for (i in 13:nrow(X_test)) {
-  X_test[i, "lag1"] <- y_test[i] - y_test[i - 12]
-}
-
-for (i in 25:nrow(X_test)) {
-  X_test[i, "lag2"] <- y_test[i] - y_test[i - 24]
-}
-
-
-#print(X_train[, "lag1", drop = FALSE])
-
-# Combinar X_train[, "lag1"] y y_train
-combined_data <- cbind(X_train[, "lag1"], X_train[, "lag2"], y_train)
-
-# Imprimir lado a lado en la consola
-#print(combined_data)
-
-# Crear una lista de diferentes valores de sesgo para probar
-bias_values <- seq(from = -1, to = 1, by = 0.1)
-#bias_value <- -0.1
-
-# Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
-mejor_sesgo <- NULL
-mejor_r2 <- -Inf
-mejor_nn <- NULL
-mejor_X_train_b <- NULL
-mejor_X_test_b <- NULL
-
-global_hidden1 <- 10
-global_hidden2 <- 10
-
-# Bucle para probar diferentes valores de sesgo
-for (bias_value in bias_values) {
+entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
+  # Dividir los datos en conjuntos de entrenamiento y prueba (70% - 30%)
+  set.seed(123)
+  n <- nrow(X)
+  n_train <- round(0.7 * n)
+  
+  # Conjunto de entrenamiento
+  X_train <- X[1:n_train, ]
+  y_train <- y[1:n_train]
+  
+  # Conjunto de prueba
+  X_test <- X[(n_train + 1):n, ]
+  y_test <- y[(n_train + 1):n]
+  
+  #Añadir columnas para lags
+  X_train <- cbind(X_train,
+                   lag1 = rep(NA, nrow(X_train)),
+                   lag2 = rep(NA, nrow(X_train)))
+  X_test <- cbind(X_test, lag1 = rep(NA, nrow(X_test)), lag2 = rep(NA, nrow(X_test)))
+  
+  #Primeros 12 lags son los mismos valores de y (temp reales)
+  X_train[, "lag1"] <- y_train
+  X_train[, "lag2"] <- y_train
+  
+  X_test[, "lag1"] <- y_test
+  X_test[, "lag2"] <- y_test
+  
+  # Agregar lag1 y lag2
+  for (i in 13:nrow(X_train)) {
+    X_train[i, "lag1"] <- y_train[i] - y_train[i - 12]
+  }
+  
+  for (i in 25:nrow(X_train)) {
+    X_train[i, "lag2"] <- y_train[i] - y_train[i - 24]
+  }
+  
+  
+  for (i in 13:nrow(X_test)) {
+    X_test[i, "lag1"] <- y_test[i] - y_test[i - 12]
+  }
+  
+  for (i in 25:nrow(X_test)) {
+    X_test[i, "lag2"] <- y_test[i] - y_test[i - 24]
+  }
+  
+  
+  #print(X_train[, "lag1", drop = FALSE])
+  
+  # Combinar X_train[, "lag1"] y y_train
+  combined_data <- cbind(X_train[, "lag1"], X_train[, "lag2"], y_train)
+  
+  # Imprimir lado a lado en la consola
+  #print(combined_data)
+  
+  # Crear una lista de diferentes valores de sesgo para probar
+  #bias_values <- seq(from = -1, to = 1, by = 0.1)
+  bias_value <- -0.1
+  
+  # Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
+  mejor_sesgo <- NULL
+  mejor_r2 <- -Inf
+  mejor_nn <- NULL
+  mejor_X_train_b <- NULL
+  mejor_X_test_b <- NULL
+  
+  global_hidden1 <- 10
+  global_hidden2 <- 10
+  
+  # Bucle para probar diferentes valores de sesgo
+  #for (bias_value in bias_values) {
   # Añadir una columna de sesgo a X_train y X_test
   X_train_b <- cbind(bias_value, X_train)
   X_test_b <- cbind(bias_value, X_test)
@@ -283,81 +286,82 @@ for (bias_value in bias_values) {
     mejor_X_test_b <- X_test_b
     mejor_nn <- nn
   }
-}
-
-nn <- mejor_nn
-X_train_b <- mejor_X_train_b
-X_test_b <- mejor_X_test_b
-
-# Calcular errores
-errores <- y_test - nn$feedforward(X_test_b)
-
-# Calcular el Error Cuadrático Medio (MSE)
-mse <- mean(errores ^ 2)
-rmse <- sqrt(mse)
-# Calcular el Error Absoluto Medio (MAE)
-mae <- mean(abs(errores))
-mae_ingenuo <- mean(abs(diff(y_train)))
-mase <- mae / mae_ingenuo
-# Calcular el R² para las predicciones de entrenamiento
-errores_entrenamiento <- y_train - nn$feedforward(X_train_b)
-ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
-ss_tot_entrenamiento <- sum((y_train - mean(y_train)) ^ 2)
-r_cuadrado_entrenamiento <- 1 - (ss_res_entrenamiento / ss_tot_entrenamiento)
-
-# Calcular el R² para las predicciones de prueba
-errores_prueba<- y_test - nn$feedforward(X_test_b)
-ss_res_prueba <- sum(errores_prueba ^ 2)
-ss_tot_prueba <- sum((y_test - mean(y_test)) ^ 2)
-r_cuadrado_prueba <- 1 - (ss_res_prueba / ss_tot_prueba)
-
-
-# Imprimir el mejor sesgo y R²
-cat("Mejor Sesgo:", mejor_sesgo, "\n")
-#mse
-cat("Error Cuadrático Medio:", mse, "\n")
-#rmse
-cat("Raiz del Error Cuadrático Medio:", rmse, "\n")
-#mae
-cat("Error Absoluto Medio:", mae, "\n")
-cat("Error Absoluto Medio Escalado:", mase, "\n")
-# Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
-cat(
-  "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",
-  r_cuadrado_entrenamiento,
-  "\n"
-)
-cat("Coeficiente de Predicción R²:", r_cuadrado_prueba, "\n")
-
-#print(X_test_b)
-
-# Crear vector de errores
-errores <- y_train - nn$feedforward(X_train_b)
-errores_test <- runif(nrow(X_test), min(errores), max(errores))
-
-#Añadir errores al conjunto de entrenamiento
-X_train_con_errores <- cbind(X_train, errores)
-#ruido blanco para conjunto de prueba
-X_test_con_errores <- cbind(X_test, errores_test)
-
-#print(X_train_con_errores)
-#print(X_test_con_errores)
-
-
-#Entrenar nuevamente la red con los errores calculados
-# Crear una lista de diferentes valores de sesgo para probar
-bias_values <- seq(from = -1, to = 1, by = 0.1)
-#bias_value <- -0.1
-
-# Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
-mejor_sesgo <- NULL
-mejor_r2 <- -Inf
-mejor_nn <- NULL
-mejor_X_train_con_errores_b <- NULL
-mejor_X_test_con_errores_b <- NULL
-
-# Bucle para probar diferentes valores de sesgo
-for (bias_value in bias_values) {
+  #}
+  
+  nn <- mejor_nn
+  X_train_b <- mejor_X_train_b
+  X_test_b <- mejor_X_test_b
+  
+  # Calcular errores
+  errores <- y_test - nn$feedforward(X_test_b)
+  
+  # Calcular el Error Cuadrático Medio (MSE)
+  mse <- mean(errores ^ 2)
+  rmse <- sqrt(mse)
+  # Calcular el Error Absoluto Medio (MAE)
+  mae <- mean(abs(errores))
+  mae_ingenuo <- mean(abs(diff(y_train)))
+  mase <- mae / mae_ingenuo
+  # Calcular el R² para las predicciones de entrenamiento
+  errores_entrenamiento <- y_train - nn$feedforward(X_train_b)
+  ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
+  ss_tot_entrenamiento <- sum((y_train - mean(y_train)) ^ 2)
+  r_cuadrado_entrenamiento <- 1 - (ss_res_entrenamiento / ss_tot_entrenamiento)
+  
+  # Calcular el R² para las predicciones de prueba
+  errores_prueba<- y_test - nn$feedforward(X_test_b)
+  ss_res_prueba <- sum(errores_prueba ^ 2)
+  ss_tot_prueba <- sum((y_test - mean(y_test)) ^ 2)
+  r_cuadrado_prueba <- 1 - (ss_res_prueba / ss_tot_prueba)
+  
+  
+  # Imprimir el mejor sesgo y R²
+  cat("Mejor Sesgo:", mejor_sesgo, "\n")
+  #mse
+  cat("Error Cuadrático Medio:", mse, "\n")
+  #rmse
+  cat("Raiz del Error Cuadrático Medio:", rmse, "\n")
+  #mae
+  cat("Error Absoluto Medio:", mae, "\n")
+  cat("Error Absoluto Medio Escalado:", mase, "\n")
+  # Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
+  cat(
+    "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",
+    r_cuadrado_entrenamiento,
+    "\n"
+  )
+  cat("Coeficiente de Predicción R²:", r_cuadrado_prueba, "\n")
+  cat("--------------------------------------------------------")
+  
+  #print(X_test_b)
+  
+  # Crear vector de errores
+  errores <- y_train - nn$feedforward(X_train_b)
+  errores_test <- runif(nrow(X_test), min(errores), max(errores))
+  
+  #Añadir errores al conjunto de entrenamiento
+  X_train_con_errores <- cbind(X_train, errores)
+  #ruido blanco para conjunto de prueba
+  X_test_con_errores <- cbind(X_test, errores_test)
+  
+  #print(X_train_con_errores)
+  #print(X_test_con_errores)
+  
+  
+  #Entrenar nuevamente la red con los errores calculados
+  # Crear una lista de diferentes valores de sesgo para probar
+  #bias_values <- seq(from = -1, to = 1, by = 0.1)
+  bias_value <- -0.1
+  
+  # Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
+  mejor_sesgo <- NULL
+  mejor_r2 <- -Inf
+  mejor_nn <- NULL
+  mejor_X_train_con_errores_b <- NULL
+  mejor_X_test_con_errores_b <- NULL
+  
+  # Bucle para probar diferentes valores de sesgo
+  #for (bias_value in bias_values) {
   X_train_con_errores_b <- cbind(bias_value, X_train_con_errores)
   X_test_con_errores_b <- cbind(bias_value, X_test_con_errores)
   
@@ -388,213 +392,248 @@ for (bias_value in bias_values) {
     mejor_X_test_con_errores_b <- X_test_con_errores_b
     mejor_nn <- nn
   }
+  #}
+  
+  nn <- mejor_nn
+  X_train_con_errores_b <- mejor_X_train_con_errores_b
+  X_test_con_errores_b <- mejor_X_test_con_errores_b
+  
+  
+  
+  # Calcular errores
+  errores <- y_test - nn$feedforward(X_test_con_errores_b)
+  # Calcular el Error Cuadrático Medio (MSE)
+  mse <- mean(errores ^ 2)
+  # Calcular el Error Absoluto Medio (MAE)
+  mae <- mean(abs(errores))
+  # Calcular el R² para las predicciones de entrenamiento
+  mae_ingenuo <- mean(abs(diff(y_train)))
+  mase <- mae / mae_ingenuo
+  errores_entrenamiento <- y_train - nn$feedforward(X_train_con_errores_b)
+  ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
+  ss_tot_entrenamiento <- sum((y_train - mean(y_train)) ^ 2)
+  r_cuadrado_entrenamiento <- 1 - (ss_res_entrenamiento / ss_tot_entrenamiento)
+  
+  # Calcular el R² para las predicciones de prueba
+  errores_prueba<- y_test - nn$feedforward(X_test_con_errores_b)
+  ss_res_prueba <- sum(errores_prueba ^ 2)
+  ss_tot_prueba <- sum((y_test - mean(y_test)) ^ 2)
+  r_cuadrado_prueba <- 1 - (ss_res_prueba / ss_tot_prueba)
+  
+  
+  # Imprimir el mejor sesgo y R²
+  cat("Mejor Sesgo:", mejor_sesgo, "\n")
+  #mse
+  cat("Error Cuadrático Medio:", mse, "\n")
+  #rmse
+  cat("Raiz del Error Cuadrático Medio:", rmse, "\n")
+  #mae
+  cat("Error Absoluto Medio:", mae, "\n")
+  cat("Error Absoluto Medio Escalado:", mase, "\n")
+  # Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
+  cat(
+    "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",
+    r_cuadrado_entrenamiento,
+    "\n"
+  )
+  cat("Coeficiente de Predicción R²:", r_cuadrado_prueba, "\n")
+  cat("--------------------------------------------------------")
+  
+  
+  
+  # Hacer predicciones sobre el conjunto de prueba
+  predicciones_prueba <- nn$feedforward(X_test_con_errores_b)
+  
+  
+  # Crear un vector con NA para el tamaño total de los datos
+  predicciones_total <- rep(NA, n)
+  
+  # Colocar las predicciones del conjunto de prueba en el vector total de predicciones
+  predicciones_total[(n_train + 1):n] <- predicciones_prueba
+  
+  
+  #print(predicciones_total)
+  
+  # plot(df$temperature, type = "l", col = "blue", lwd=2, xlab = "Index", ylab = "Precipitación Normalizada", main = "Precipitaciones Reales vs. Predicciones")
+  # lines(nn$feedforward(X_train), col = "red",lwd=2)
+  # lines(predicciones_total, col = "green",lwd=2)
+  #
+  # legend("topright", legend = c("Precipitación Real", "Ajuste de Entrenamiento (70%)", "Predicciones (30% de Prueba)"), col = c("blue", "red", "green"), lty = 1)
+  
+  # Calcular los residuos
+  residuos <- y_test - predicciones_prueba
+  
+  # Calcular los residuos estandarizados
+  residuos_estandarizados <- residuos / sd(residuos)
+  
+  
+  par(mfrow=c(3,1), mar=c(4,4,4,1)+.1)
+  # Graficar los residuos estandarizados
+  plot(residuos_estandarizados, type = "h", col = "black", lwd = 1, xlab = "Índice", ylab = "Residuos Estandarizados", main = "Residuos Estandarizados")
+  abline(h = 0, col = "black", lty = 1)
+  # Calcular la función de autocorrelación de los residuos
+  acf_residuos <- acf(residuos, main = "ACF de Residuos", lag.max = 20)
+  
+  # Calcular la estadística de prueba Q_k para cada lag k
+  Q_statistic <- acf_residuos$acf[-1]^2 * length(residuos)
+  
+  # Calcular los valores críticos para el test de Ljung-Box
+  valores_criticos <- qchisq(0.95, df = acf_residuos$lag[-1])
+  
+  # Calcular los p-values
+  p_values <- 1 - pchisq(Q_statistic, df = acf_residuos$lag[-1])
+  
+  plot(p_values, xlab = "Lag", ylab = "p-value", 
+       main = "p-values del Test de Ljung-Box",
+       type = "p")  # Cambiado de "o" a "p"
+  abline(h = 0.05, col = "blue", lty = 2)  # Agrega una línea en 0.05 para referencia
+  
+  # Añadir etiquetas al eje x
+  axis(1, at = seq_along(p_values), labels = seq_along(p_values))
+  
+  
+  # Plotear con las fechas ajustadas
+  # Reiniciar el diseño de gráficos
+  par(mfrow=c(1,1))
+  par(mar = c(5, 4, 4, 9) + 0.1)
+  fecha_inicio <- as.Date("1978-12-15") %m+% months(windows_size)
+  fechas_ajustadas <- seq(fecha_inicio, by = "months", length.out = length(y))
+  
+  # Graficar temperaturas máximas reales vs. predicciones originales
+  plot(
+    fechas_ajustadas,
+    y,
+    type = "l",
+    col = "blue",
+    lwd = 1,
+    xlab = "Fecha",
+    ylab = variable,
+    main = titulo,
+    xlim = c(min(fechas_ajustadas), as.Date("2030-01-01")),
+     panel.first = grid(9,lty = 1)
+  )
+  
+  # Obtener las predicciones para el conjunto de entrenamiento y prueba
+  predicciones_entrenamiento <- nn$feedforward(X_train_con_errores_b)
+  predicciones_prueba <- predicciones_total[(n_train + 1):n]
+  
+  # Crear un vector de fechas para el conjunto de entrenamiento y prueba
+  fechas_entrenamiento <- fechas_ajustadas[1:n_train]
+  fechas_prueba <- fechas_ajustadas[(n_train + 1):n]
+  
+  # Agregar líneas para el ajuste de entrenamiento y las predicciones de prueba
+  lines(
+    fechas_entrenamiento,
+    predicciones_entrenamiento,
+    col = rgb(0, 128, 0, maxColorValue = 255),
+    lwd = 2
+  )
+  lines(
+    fechas_prueba,
+    predicciones_prueba,
+    col = rgb(255, 0, 0, maxColorValue = 255),
+    lwd = 2
+  )
+  
+  # Definir el número de nuevas predicciones a generar
+  n_futuras <- 120
+  
+  ultima_fila <- X_test_con_errores_b[nrow(X_test_con_errores_b), ]
+  # Inicializar una matriz vacía para almacenar los nuevos datos
+  nuevos_datos <- matrix(nrow = 0, ncol = ncol(X_test_con_errores_b))
+  
+  # Generar nuevas predicciones y añadirlas al gráfico
+  for(i in 1:n_futuras){
+    #print(ultima_fila)
+    nueva_fila <- ultima_fila[3:(length(ultima_fila)-3)]
+    #print(nueva_fila)
+    prediccion <- nn$feedforward(ultima_fila)
+    #print(prediccion)
+    #Quiero predecir el dato siguiente que no está en el arreglo
+    #Digamos que quiero predecir enero, la ultima temperatura es diciembre
+    #actual = diciembre, diciembre - 11 = enero (lag anterior)
+    lag1 <- prediccion - nueva_fila[length(ultima_fila) - 11]
+    lag2 <- prediccion - nueva_fila[length(ultima_fila) - 23]
+    error_prediccion <- runif(1, min(errores), max(errores))
+    #print(lag1)
+    #print(lag2)
+    nueva_fila <- c(nueva_fila,prediccion)
+    #print(nueva_fila)
+    nueva_fila <- c("bias"=mejor_sesgo, nueva_fila, "lag1"=lag1, "lag2"=lag2,"error"=error_prediccion)
+    #print(length(nueva_fila))
+    nuevos_datos <- rbind(nuevos_datos, nueva_fila)  # Agregar nueva fila a nuevos_datos
+    #print(nueva_fila)
+    #print(nuevos_datos)
+    ultima_fila <- nueva_fila
+    #print(ultima_fila)
+  }
+  
+  # Hacer predicciones sobre los nuevos datos
+  predicciones_nuevas <- nn$feedforward(nuevos_datos)
+  
+  
+  # Crear un vector de fechas para las nuevas predicciones
+  fechas_nuevas <- seq(fechas_prueba[length(fechas_prueba)] + 1, by = "months", length.out = length(predicciones_nuevas))
+  #print(fechas_nuevas)
+  
+  
+  if(tipo == "temp") p_nuevas_denor <- denormalize(predicciones_nuevas, tmax_min, tmax_max)
+  else if (tipo == "prec") p_nuevas_denor <- denormalize(predicciones_nuevas, pr_min, pr_max)
+  #p_nuevas_denor <- denormalize(predicciones_nuevas, pr_min, pr_max)
+  # Imprimir fechas y valores correspondientes para nuevas predicciones
+  #cat("\nNuevas predicciones:\n")
+  #for (i in 1:length(predicciones_nuevas)) {
+  #  cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(predicciones_nuevas[i], digits = 4), "\n")
+  #}
+  
+  # Imprimir fechas y valores correspondientes para nuevas predicciones
+  cat("\nNuevas predicciones:\n")
+  for (i in 1:length(p_nuevas_denor)) {
+    cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(p_nuevas_denor[i], digits = 4), "\n")
+  }
+  
+  # Agregar líneas para las nuevas predicciones
+  lines(
+    fechas_nuevas,
+    predicciones_nuevas,
+    col = "orange",
+    lwd = 2
+  )
+  xoff <-0.75
+  yoff <- -0.23
+  # Agregar la leyenda
+  legend(
+    x = 22700,
+    y = 1.15,
+    legend = c("Real", "Ajuste", "Predicción", "Predicciones \nfuturas"),
+    col = c("blue", rgb(0,128,0,maxColorValue = 255), "red", "orange"),
+    lty = 1,
+    xpd = TRUE,
+    inset = c(-0.25, 0),
+    box.col = "white"
+  )
+  
+  
+  texto_metricas <- paste("RECM:", round(rmse, 4),
+                          "\nEAM:", round(mae, 4),
+                          "\nEAME:", round(mase, 4),
+                          "\nR²:", round(r_cuadrado, 4))
+  
+  
+  
+  grid.text(label = "Métricas", x = unit(xoff+0.01, "npc"), y = unit(0.74 + yoff, "npc"),
+            just = "left", gp = gpar(fontsize = 12, col = "black"))
+  grid.text(label = texto_metricas, x = unit(xoff+0.01, "npc"), y = unit(0.6 + yoff, "npc"),
+            just = "left", gp = gpar(col = "black", fontsize = 10))
+  
 }
 
-nn <- mejor_nn
-X_train_con_errores_b <- mejor_X_train_con_errores_b
-X_test_con_errores_b <- mejor_X_test_con_errores_b
-
-
-
-# Calcular errores
-errores <- y_test - nn$feedforward(X_test_con_errores_b)
-# Calcular el Error Cuadrático Medio (MSE)
-mse <- mean(errores ^ 2)
-# Calcular el Error Absoluto Medio (MAE)
-mae <- mean(abs(errores))
-# Calcular el R² para las predicciones de entrenamiento
-mae_ingenuo <- mean(abs(diff(y_train)))
-mase <- mae / mae_ingenuo
-errores_entrenamiento <- y_train - nn$feedforward(X_train_con_errores_b)
-ss_res_entrenamiento <- sum(errores_entrenamiento ^ 2)
-ss_tot_entrenamiento <- sum((y_train - mean(y_train)) ^ 2)
-r_cuadrado_entrenamiento <- 1 - (ss_res_entrenamiento / ss_tot_entrenamiento)
-
-# Calcular el R² para las predicciones de prueba
-errores_prueba<- y_test - nn$feedforward(X_test_con_errores_b)
-ss_res_prueba <- sum(errores_prueba ^ 2)
-ss_tot_prueba <- sum((y_test - mean(y_test)) ^ 2)
-r_cuadrado_prueba <- 1 - (ss_res_prueba / ss_tot_prueba)
-
-
-# Imprimir el mejor sesgo y R²
-cat("Mejor Sesgo:", mejor_sesgo, "\n")
-#mse
-cat("Error Cuadrático Medio:", mse, "\n")
-#mae
-cat("Error Absoluto Medio:", mae, "\n")
-cat("Error Absoluto Medio Escalado:", mase, "\n")
-# Reportar el coeficiente de determinación (R²) para los datos de entrenamiento
-cat(
-  "Coeficiente de Determinación (R^2) para los datos de entrenamiento:",
-  r_cuadrado_entrenamiento,
-  "\n"
-)
-cat("Coeficiente de Predicción R²:", r_cuadrado_prueba, "\n")
-
-# Hacer predicciones sobre el conjunto de prueba
-predicciones_prueba <- nn$feedforward(X_test_con_errores_b)
-
-
-# Crear un vector con NA para el tamaño total de los datos
-predicciones_total <- rep(NA, n)
-
-# Colocar las predicciones del conjunto de prueba en el vector total de predicciones
-predicciones_total[(n_train + 1):n] <- predicciones_prueba
-
-
-#print(predicciones_total)
-
-# plot(df$temperature, type = "l", col = "blue", lwd=2, xlab = "Index", ylab = "Precipitación Normalizada", main = "Precipitaciones Reales vs. Predicciones")
-# lines(nn$feedforward(X_train), col = "red",lwd=2)
-# lines(predicciones_total, col = "green",lwd=2)
-#
-# legend("topright", legend = c("Precipitación Real", "Ajuste de Entrenamiento (70%)", "Predicciones (30% de Prueba)"), col = c("blue", "red", "green"), lty = 1)
-
-# Calcular los residuos
-residuos <- y_test - predicciones_prueba
-
-# Calcular los residuos estandarizados
-residuos_estandarizados <- residuos / sd(residuos)
-
-
-par(mfrow=c(3,1), mar=c(4,4,4,1)+.1)
-# Graficar los residuos estandarizados
-plot(residuos_estandarizados, type = "h", col = "black", lwd = 1, xlab = "Índice", ylab = "Residuos Estandarizados", main = "Residuos Estandarizados")
-abline(h = 0, col = "black", lty = 1)
-# Calcular la función de autocorrelación de los residuos
-acf_residuos <- acf(residuos, main = "ACF de Residuos", lag.max = 20)
-
-# Calcular la estadística de prueba Q_k para cada lag k
-Q_statistic <- acf_residuos$acf[-1]^2 * length(residuos)
-
-# Calcular los valores críticos para el test de Ljung-Box
-valores_criticos <- qchisq(0.95, df = acf_residuos$lag[-1])
-
-# Calcular los p-values
-p_values <- 1 - pchisq(Q_statistic, df = acf_residuos$lag[-1])
-
-plot(p_values, xlab = "Lag", ylab = "p-value", 
-     main = "p-values del Test de Ljung-Box",
-     type = "p")  # Cambiado de "o" a "p"
-abline(h = 0.05, col = "blue", lty = 2)  # Agrega una línea en 0.05 para referencia
-
-# Añadir etiquetas al eje x
-axis(1, at = seq_along(p_values), labels = seq_along(p_values))
-
-
-# Plotear con las fechas ajustadas
-# Reiniciar el diseño de gráficos
-par(mfrow=c(1,1))
-par(mar = c(5, 4, 4, 9) + 0.1)
-fecha_inicio <- as.Date("1978-12-15") %m+% months(windows_size)
-fechas_ajustadas <- seq(fecha_inicio, by = "months", length.out = length(y))
-
-# Graficar temperaturas máximas reales vs. predicciones originales
-plot(
-  fechas_ajustadas,
-  y,
-  type = "l",
-  col = "blue",
-  lwd = 1,
-  xlab = "Fecha",
-  ylab = "Temperaturas Máximas Normalizada",
-  main = "Temperaturas máximas Reales vs. Predicciones",
-  xlim = c(min(fechas_ajustadas), as.Date("2030-01-01"))
-)
-
-# Obtener las predicciones para el conjunto de entrenamiento y prueba
-predicciones_entrenamiento <- nn$feedforward(X_train_con_errores_b)
-predicciones_prueba <- predicciones_total[(n_train + 1):n]
-
-# Crear un vector de fechas para el conjunto de entrenamiento y prueba
-fechas_entrenamiento <- fechas_ajustadas[1:n_train]
-fechas_prueba <- fechas_ajustadas[(n_train + 1):n]
-
-# Agregar líneas para el ajuste de entrenamiento y las predicciones de prueba
-lines(
-  fechas_entrenamiento,
-  predicciones_entrenamiento,
-  col = rgb(0, 128, 0, maxColorValue = 255),
-  lwd = 2
-)
-lines(
-  fechas_prueba,
-  predicciones_prueba,
-  col = rgb(255, 0, 0, maxColorValue = 255),
-  lwd = 2
-)
-
-# Definir el número de nuevas predicciones a generar
-n_futuras <- 120
-
-ultima_fila <- X_test_con_errores_b[nrow(X_test_con_errores_b), ]
-# Inicializar una matriz vacía para almacenar los nuevos datos
-nuevos_datos <- matrix(nrow = 0, ncol = ncol(X_test_con_errores_b))
-
-# Generar nuevas predicciones y añadirlas al gráfico
-for(i in 1:n_futuras){
-  #print(ultima_fila)
-  nueva_fila <- ultima_fila[3:(length(ultima_fila)-3)]
-  #print(nueva_fila)
-  prediccion <- nn$feedforward(ultima_fila)
-  #print(prediccion)
-  lag1 <- prediccion - nueva_fila[length(ultima_fila) - 11]
-  lag2 <- prediccion - nueva_fila[length(ultima_fila) - 23]
-  error_prediccion <- runif(1, min(errores), max(errores))
-  #print(lag1)
-  #print(lag2)
-  nueva_fila <- c(nueva_fila,prediccion)
-  #print(nueva_fila)
-  nueva_fila <- c("bias"=mejor_sesgo, nueva_fila, "lag1"=lag1, "lag2"=lag2,"error"=error_prediccion)
-  #print(length(nueva_fila))
-  nuevos_datos <- rbind(nuevos_datos, nueva_fila)  # Agregar nueva fila a nuevos_datos
-  #print(nueva_fila)
-  #print(nuevos_datos)
-  ultima_fila <- nueva_fila
-  #print(ultima_fila)
-}
-
-# Hacer predicciones sobre los nuevos datos
-predicciones_nuevas <- nn$feedforward(nuevos_datos)
-
-
-# Crear un vector de fechas para las nuevas predicciones
-fechas_nuevas <- seq(fechas_prueba[length(fechas_prueba)] + 1, by = "months", length.out = length(predicciones_nuevas))
-#print(fechas_nuevas)
-
-
-p_nuevas_denor <- denormalize(predicciones_nuevas, tmax_min, tmax_max)
-#p_nuevas_denor <- denormalize(predicciones_nuevas, pr_min, pr_max)
-# Imprimir fechas y valores correspondientes para nuevas predicciones
-#cat("\nNuevas predicciones:\n")
-#for (i in 1:length(predicciones_nuevas)) {
-#  cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(predicciones_nuevas[i], digits = 4), "\n")
-#}
-
-# Imprimir fechas y valores correspondientes para nuevas predicciones
-cat("\nNuevas predicciones:\n")
-for (i in 1:length(p_nuevas_denor)) {
-  cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(p_nuevas_denor[i], digits = 4), "\n")
-}
-
-# Agregar líneas para las nuevas predicciones
-lines(
-  fechas_nuevas,
-  predicciones_nuevas,
-  col = "orange",
-  lwd = 2
-)
-
-# Agregar la leyenda
-legend(
-  "topright",
-  legend = c("Real", "Ajuste", "Predicción", "Predicciones futuras"),
-  col = c("blue", "green", "red", "orange"),
-  lty = 1,
-  xpd = TRUE,
-  inset = c(-0.25, 0)
-)
+entrenar_y_graficar(X,y, "temp", "Temperatura Máxima [°C]", "Serie Temporal Normalizada de Temperatura Máxima y Predicciones \ncon Red Neuronal")
+X <- NULL
+y <- NULL
+X <- windows_pr$X
+y <- windows_pr$y
+entrenar_y_graficar(X,y, "prec", "Precipitación Máxima [mm]", "Serie Temporal Normalizada de Precipitación Máxima y Predicciones \ncon Red Neuronal")
 
 
 
