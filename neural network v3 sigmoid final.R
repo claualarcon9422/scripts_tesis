@@ -240,8 +240,8 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   #print(combined_data)
   
   # Crear una lista de diferentes valores de sesgo para probar
-  #bias_values <- seq(from = -1, to = 1, by = 0.1)
-  bias_value <- -0.1
+  bias_values <- seq(from = -1, to = 1, by = 0.1)
+  #bias_value <- -0.1
   
   # Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
   mejor_sesgo <- NULL
@@ -254,7 +254,7 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   global_hidden2 <- 10
   
   # Bucle para probar diferentes valores de sesgo
-  #for (bias_value in bias_values) {
+  for (bias_value in bias_values) {
   # Añadir una columna de sesgo a X_train y X_test
   X_train_b <- cbind(bias_value, X_train)
   X_test_b <- cbind(bias_value, X_test)
@@ -286,7 +286,7 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
     mejor_X_test_b <- X_test_b
     mejor_nn <- nn
   }
-  #}
+  }
   
   nn <- mejor_nn
   X_train_b <- mejor_X_train_b
@@ -350,8 +350,8 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   
   #Entrenar nuevamente la red con los errores calculados
   # Crear una lista de diferentes valores de sesgo para probar
-  #bias_values <- seq(from = -1, to = 1, by = 0.1)
-  bias_value <- -0.1
+  bias_values <- seq(from = -1, to = 1, by = 0.1)
+  #bias_value <- -0.1
   
   # Inicializar variables para guardar el mejor sesgo, mejor R² y el mejor modelo
   mejor_sesgo <- NULL
@@ -361,7 +361,7 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   mejor_X_test_con_errores_b <- NULL
   
   # Bucle para probar diferentes valores de sesgo
-  #for (bias_value in bias_values) {
+  for (bias_value in bias_values) {
   X_train_con_errores_b <- cbind(bias_value, X_train_con_errores)
   X_test_con_errores_b <- cbind(bias_value, X_test_con_errores)
   
@@ -392,7 +392,7 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
     mejor_X_test_con_errores_b <- X_test_con_errores_b
     mejor_nn <- nn
   }
-  #}
+  }
   
   nn <- mejor_nn
   X_train_con_errores_b <- mejor_X_train_con_errores_b
@@ -499,10 +499,13 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   fecha_inicio <- as.Date("1978-12-15") %m+% months(windows_size)
   fechas_ajustadas <- seq(fecha_inicio, by = "months", length.out = length(y))
   
+  media_serie <- mean(y)
+  
   # Graficar temperaturas máximas reales vs. predicciones originales
   plot(
     fechas_ajustadas,
     y,
+    panel.first = grid(col = "lightgray",lty = 1),
     type = "l",
     col = "blue",
     lwd = 1,
@@ -510,8 +513,11 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
     ylab = variable,
     main = titulo,
     xlim = c(min(fechas_ajustadas), as.Date("2030-01-01")),
-     panel.first = grid(9,lty = 1)
+
   )
+  
+  # Agregar línea para la media
+  abline(h = media_serie, col = "purple", lwd = 1, lty = 2)
   
   # Obtener las predicciones para el conjunto de entrenamiento y prueba
   predicciones_entrenamiento <- nn$feedforward(X_train_con_errores_b)
@@ -600,14 +606,14 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
     lwd = 2
   )
   xoff <-0.75
-  yoff <- -0.23
+  yoff <- -0.3
   # Agregar la leyenda
   legend(
     x = 22700,
     y = 1.15,
-    legend = c("Real", "Ajuste", "Predicción", "Predicciones \nfuturas"),
-    col = c("blue", rgb(0,128,0,maxColorValue = 255), "red", "orange"),
-    lty = 1,
+    legend = c("Real", "Ajuste", "Media", "Predicción", "Predicciones \nfuturas"),
+    col = c("blue", rgb(0,128,0,maxColorValue = 255),"purple", "red", "orange"),
+    lty = c(1, 1,2,1,1),
     xpd = TRUE,
     inset = c(-0.25, 0),
     box.col = "white"

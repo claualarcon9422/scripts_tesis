@@ -140,6 +140,8 @@ ajustar_y_graficar <- function(serie,tipo,variable, titulo) {
   # Crear un data frame con la serie temporal
   df <- data.frame(Fecha = index(serie), Valor = coredata(serie))
   
+  media_original <- mean(df$Valor)
+  
   # Dividir los datos en conjuntos de entrenamiento y prueba (70% - 30%)
   n <- nrow(df)
   n_train <- round(0.7 * n)
@@ -249,31 +251,33 @@ ajustar_y_graficar <- function(serie,tipo,variable, titulo) {
     geom_line(data = data.frame(Fecha = datos_prueba$Fecha, Prediccion = predicciones$mean),
               aes(x = Fecha, y = Prediccion, color = "Predicción"), linewidth = 0.70) +
     geom_ribbon(data = intervalos_df, aes(x = Fecha, ymin = Lower, ymax = Upper, fill = "Intervalo de confianza"), alpha = 0.5) +
+    geom_hline(aes(yintercept = media_original, color = "Media"), linetype = "dashed", size = 0.7) + 
     labs(x = "Fecha", y = variable, 
          title = titulo,
          color = "Variables") +
     scale_x_date(date_breaks = "72 month", date_labels = "%b %Y") +
     theme_bw() +
     coord_cartesian(clip = "off") +
-    theme(legend.position = c(1.01, 1),
+    theme(legend.position = c(1.01, 1.01),
           legend.justification = c(0,1))+ 
     theme(plot.margin = margin(5.5, 130, 5.5, 5.5)) +
     guides(
       color = guide_legend(order = 1),  # Orden de la leyenda de las líneas
       fill = guide_legend(order = 2)    # Orden de la leyenda de la cinta
     )+
-    scale_color_manual(values = c("Original" = "blue", "Ajuste" = rgb(0,128,0,maxColorValue = 255), "Predicción"  = rgb(255,0,0,maxColorValue = 255)))
+    scale_color_manual(values = c("Original" = "blue", "Ajuste" = rgb(0,128,0,maxColorValue = 255), "Predicción"  = rgb(255,0,0,maxColorValue = 255), "Media"="purple"))
   
   # Añadir un cuadradito manual para el intervalo de confianza en la leyenda
   grafico <- grafico + 
     scale_fill_manual(name = "", values = "lightblue",
-                      labels = c("Intervalo de confianza" = "Intervalo de confianza"))
+                      labels = c("Intervalo de confianza" = "Intervalo de confianza"))#+
+    #theme(legend.position = c(1.01, 1.05))
   
   # Dibujar el gráfico
   grid.newpage()
   grid.draw(grafico)
   xoff <-0.75
-  yoff <- -0.23
+  yoff <- -0.3
   
   grid.text(label = "Métricas", x = unit(xoff+0.01, "npc"), y = unit(0.74 + yoff, "npc"),
             just = "left", gp = gpar(fontsize = 12, col = "black"))
