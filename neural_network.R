@@ -1,3 +1,4 @@
+
 library(ncdf4)
 library(xts)
 library(R6)
@@ -183,6 +184,7 @@ y <- windows_tmax$y
 
 
 
+#print(X)
 #print(y)
 
 entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
@@ -200,44 +202,43 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   y_test <- y[(n_train + 1):n]
   
   #Añadir columnas para lags
-  X_train <- cbind(X_train,
-                   lag1 = rep(NA, nrow(X_train)),
-                   lag2 = rep(NA, nrow(X_train)))
-  X_test <- cbind(X_test, lag1 = rep(NA, nrow(X_test)), lag2 = rep(NA, nrow(X_test)))
+  X_train <- cbind(X_train, lag1 = rep(NA, nrow(X_train)), lag2 = rep(NA, nrow(X_train)))
+  X_test  <- cbind(X_test,  lag1 = rep(NA, nrow(X_test)),  lag2 = rep(NA, nrow(X_test)))
   
-  #Primeros 12 lags son los mismos valores de y (temp reales)
+  #Primeros 13 lags son los mismos valores de y (temp reales)
+  #Calculo de deltalag desfazados 
   X_train[, "lag1"] <- y_train
   X_train[, "lag2"] <- y_train
   
   X_test[, "lag1"] <- y_test
   X_test[, "lag2"] <- y_test
   
-  # Agregar lag1 y lag2
-  for (i in 13:nrow(X_train)) {
-    X_train[i, "lag1"] <- y_train[i] - y_train[i - 12]
+  # Agregar lag1 y lag2 (desfazados)
+  for (i in 14:nrow(X_train)) {
+    X_train[i, "lag1"] <- y_train[i-1] - y_train[i - 13]
   }
   
-  for (i in 25:nrow(X_train)) {
-    X_train[i, "lag2"] <- y_train[i] - y_train[i - 24]
+  for (i in 26:nrow(X_train)) {
+    X_train[i, "lag2"] <- y_train[i-1] - y_train[i - 25]
   }
   
   
-  for (i in 13:nrow(X_test)) {
-    X_test[i, "lag1"] <- y_test[i] - y_test[i - 12]
+  for (i in 14:nrow(X_test)) {
+    X_test[i, "lag1"] <- y_test[i-1] - y_test[i - 13]
   }
   
-  for (i in 25:nrow(X_test)) {
-    X_test[i, "lag2"] <- y_test[i] - y_test[i - 24]
+  for (i in 26:nrow(X_test)) {
+    X_test[i, "lag2"] <- y_test[i-1] - y_test[i - 25]
   }
   
   
   #print(X_train[, "lag1", drop = FALSE])
   
   # Combinar X_train[, "lag1"] y y_train
-  combined_data <- cbind(X_train[, "lag1"], X_train[, "lag2"], y_train)
+  #combined_data <- cbind(X_train[, "lag1"], X_train[, "lag2"], y_train)
   
   # Imprimir lado a lado en la consola
-  #print(combined_data)
+  #print(X_train)
   
   # Crear una lista de diferentes valores de sesgo para probar
   bias_values <- seq(from = -1, to = 1, by = 0.1)
@@ -562,8 +563,8 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
     #Quiero predecir el dato siguiente que no está en el arreglo
     #Digamos que quiero predecir enero, la ultima temperatura es diciembre
     #actual = diciembre, diciembre - 11 = enero (lag anterior)
-    lag1 <- prediccion - nueva_fila[length(ultima_fila) - 11]
-    lag2 <- prediccion - nueva_fila[length(ultima_fila) - 23]
+    lag1 <- nueva_fila[length(nueva_fila)] - nueva_fila[length(nueva_fila) - 12]
+    lag2 <- nueva_fila[length(nueva_fila)] - nueva_fila[length(nueva_fila) - 24]
     error_prediccion <- runif(1, min(errores), max(errores))
     #print(lag1)
     #print(lag2)
@@ -597,10 +598,11 @@ entrenar_y_graficar <- function(X,y, tipo, variable, titulo){
   #}
   
   # Imprimir fechas y valores correspondientes para nuevas predicciones
-  #cat("\nNuevas predicciones:\n")
-  #for (i in 1:length(p_nuevas_denor)) {
-  #  cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(p_nuevas_denor[i], digits = 4), "\n")
-  #}
+  #p_nuevas_denor <- denormalize(predicciones_nuevas, pr_min, pr_max)
+  cat("\nNuevas predicciones:\n")
+  for (i in 1:length(p_nuevas_denor)) {
+    cat(format(fechas_nuevas[i], "%Y-%m-%d"), ": ", format(p_nuevas_denor[i], digits = 4), "\n")
+  }
   
   # Agregar líneas para las nuevas predicciones
   lines(
